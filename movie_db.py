@@ -1,11 +1,12 @@
-import sys # for sys.exit()
 import statistics # for median calculation
+from datetime import datetime # for current year
 import random # for random movie pick
 import matplotlib.pyplot # for histogram
 # note: in codio terminal we need to install the Levenshtein module first:
 # "python3 -m pip install Levenshtein"
 import Levenshtein # for Fuzzy Matching
 from movie_storage import movie_storage_json
+from movie_storage import movie_storage_sql
 
 EXPORT_DIR = 'data/exports/'
 
@@ -61,12 +62,12 @@ def get_movie_year():
     """
     this function prompts the user to enter a movie year
     """
-    min_year = 1920
-    max_year = 2026
+    min_year = 1888
+    current_year = datetime.now().year
     year = 0
-    while not min_year < year < max_year:
+    while not min_year <= year <= current_year:
         try:
-            year = int(input(f"Enter Movie Year ({min_year}-{max_year}): "))
+            year = int(input(f"Enter Movie Year ({min_year}-{current_year}): "))
         except ValueError:
             cprint("Invalid input!", "red")
     return year
@@ -79,19 +80,22 @@ def show_movies(movies):
     """
     cprint(f"\n{len(movies)} movies found:", "cyan")
     for movie in movies:
-        print(f"{movie['Title']}", end="")
-        cprint(f" ({movie['Year']})", "blue", end="")
+        print(f"{movie['title']}", end="")
+        cprint(f" ({movie['year']})", "blue", end="")
         print(": ", end="")
-        cprint(f"{round(movie['Rating'], 1)}", "cyan")
+        cprint(f"{round(movie['rating'], 1)}", "cyan")
 
 
 def show_all_movies():
     """
     this function shows all the movies in the database ordered by title
     """
-    movies = movie_storage_json.get_movies()
-    movies.sort(key=lambda movie: movie['Title'])
-    show_movies(movies)
+    movies = movie_storage_sql.list_movies()
+    if len(movies) > 0:
+        movies.sort(key=lambda movie: movie['title'])
+        show_movies(movies)
+    else:
+        cprint("No movies found!", "red")
 
 
 def add_movie():
@@ -99,13 +103,13 @@ def add_movie():
     this function adds a new movie to the database
     """
     movie_name = get_movie_name()
-    if movie_storage_json.movie_exists(movie_name):
+    if movie_storage_sql.movie_exists(movie_name):
         cprint(f"Movie '{movie_name}' already exists!", "red")
     else:
         year = get_movie_year()
         rating = get_movie_rating()
-        movie_storage_json.add_movie(movie_name, year, rating)
-        cprint(f"Movie '{movie_name}' successfully added", "green")
+        movie_storage_sql.add_movie(movie_name, year, rating)
+        cprint(f"Movie '{movie_name}' added successfully.", "green")
 
 
 def delete_movie():
@@ -113,9 +117,9 @@ def delete_movie():
     this function deletes a movie from the database
     """
     movie_name = get_movie_name()
-    if movie_storage_json.movie_exists(movie_name):
-        movie_storage_json.delete_movie(movie_name)
-        cprint(f"Movie '{movie_name}' successfully deleted", "green")
+    if movie_storage_sql.movie_exists(movie_name):
+        movie_storage_sql.delete_movie(movie_name)
+        cprint(f"Movie '{movie_name}' deleted successfully.", "green")
     else:
         cprint(f"Movie '{movie_name}' doesn't exist!", "red")
 
@@ -125,10 +129,10 @@ def update_movie():
     this function updates a movie rating in the database
     """
     movie_name = get_movie_name()
-    if movie_storage_json.movie_exists(movie_name):
+    if movie_storage_sql.movie_exists(movie_name):
         rating = get_movie_rating()
-        movie_storage_json.update_movie(movie_name, rating)
-        cprint(f"Movie '{movie_name}' successfully updated", "green")
+        movie_storage_sql.update_movie(movie_name, rating)
+        cprint(f"Movie '{movie_name}' updated successfully.", "green")
     else:
         cprint(f"Movie '{movie_name}' doesn't exist!", "red")
 
@@ -137,8 +141,8 @@ def show_stats():
     """
     this function prints statistics about the database
     """
-    movies = movie_storage_json.get_movies()
-    ratings = [movie['Rating'] for movie in movies]
+    movies = movie_storage_sql.list_movies()
+    ratings = [movie['rating'] for movie in movies]
     cprint(f"\n{len(movies)} movies in total", "cyan")
     cprint(f"Average rating: {round(sum(ratings)/len(ratings), 1)}")
     cprint(f"Median rating: {round(statistics.median(ratings), 1)}")
@@ -147,20 +151,20 @@ def show_stats():
     best_rating = round(max(ratings), 1)
     worst_rating = round(min(ratings), 1)
     for movie in movies:
-        if movie['Rating'] == best_rating:
-            cprint(f"Best movie: {movie['Title']}: {best_rating}", "green")
+        if movie['rating'] == best_rating:
+            cprint(f"Best movie: {movie['title']}: {best_rating}", "green")
     for movie in movies:
-        if movie['Rating'] == worst_rating:
-            cprint(f"Worst movie: {movie['Title']}: {worst_rating}", "red")
+        if movie['rating'] == worst_rating:
+            cprint(f"Worst movie: {movie['title']}: {worst_rating}", "red")
 
 
 def show_random_movie():
     """
     this function shows a random movie from the database
     """
-    movies = movie_storage_json.get_movies()
+    movies = movie_storage_sql.list_movies()
     movie = random.choice(movies)
-    cprint(f"\nYour movie for tonight: {movie['Title']}, it's rated {movie['Rating']}",
+    cprint(f"\nYour movie for tonight: {movie['title']}, it's rated {movie['rating']}",
            "magenta")
 
 
@@ -171,9 +175,9 @@ def search_movie():
     fuzzy search
     :return:
     """
-    movies = movie_storage_json.get_movies()
+    movies = movie_storage_sql.list_movies()
     search_phrase = get_movie_name().lower()
-    movies_found = [movie for movie in movies if search_phrase in movie['Title'].lower()]
+    movies_found = [movie for movie in movies if search_phrase in movie['title'].lower()]
     if len(movies_found) > 0:
         show_movies(movies_found)
     else:
@@ -192,7 +196,7 @@ def fuzzy_search_movie(movies, search_phrase):
     fuzzy_match = False
     fuzzy_matches = []
     for movie in movies:
-        title = movie['Title'].lower()
+        title = movie['title'].lower()
         # try with the entire title
         max_dist = 5 # maximum number of insertions/deletions/substitutions
         if Levenshtein.distance(search_phrase, title) <= max_dist:
@@ -218,8 +222,8 @@ def show_movies_by_rating():
     """
     this function shows the movies ordered by their ratings
     """
-    movies = movie_storage_json.get_movies()
-    sorted_movies = sorted(movies, key=lambda x: x['Rating'], reverse=True)
+    movies = movie_storage_sql.list_movies()
+    sorted_movies = sorted(movies, key=lambda x: x['rating'], reverse=True)
     show_movies(sorted_movies)
 
 
@@ -227,8 +231,8 @@ def rating_histogram():
     """
     this function creates and stores a histogram of the ratings as png
     """
-    movies = movie_storage_json.get_movies()
-    ratings = [movie['Rating'] for movie in movies]
+    movies = movie_storage_sql.list_movies()
+    ratings = [movie['rating'] for movie in movies]
     matplotlib.pyplot.hist(ratings)
     filename = input('\nEnter file name: ')
     # remove file extension if present and add '.png'
@@ -284,7 +288,7 @@ def quit_program():
     this function closes the program
     """
     print('Bye!')
-    sys.exit()
+    quit()
 
 
 def main():

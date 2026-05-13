@@ -1,10 +1,14 @@
 from sqlalchemy import create_engine, text
+#from movie_storage_sql import add_movie, list_movies, delete_movie, update_movie
 
 # Define the database URL
-DB_URL = "sqlite:///../data/movies.db"
+DB_URL = "sqlite:///data/movies.db" # when called from movie_db.py
+
+if __name__ == "__main__":
+    DB_URL = "sqlite:///../data/movies.db"  # when called from this file
 
 # Create the engine
-engine = create_engine(DB_URL, echo=True)
+engine = create_engine(DB_URL, echo=False)
 
 # Create the movies table if it does not exist
 with engine.connect() as connection:
@@ -19,13 +23,27 @@ with engine.connect() as connection:
     connection.commit()
 
 
+def movie_exists(movie_name):
+    """
+    Checks if a movie is in the database.
+    :param movie_name: movie name
+    :return: True if it is in the database, False otherwise
+    """
+    movies = list_movies()
+    for movie in movies:
+        if movie['title'] == movie_name:
+            return True
+    return False
+
+
 def list_movies():
     """Retrieve all movies from the database."""
     with engine.connect() as connection:
         result = connection.execute(text("SELECT title, year, rating FROM movies"))
         movies = result.fetchall()
 
-    return {row[0]: {"year": row[1], "rating": row[2]} for row in movies}
+#    return {row[0]: {"year": row[1], "rating": row[2]} for row in movies}
+    return [{'title': row[0], 'year': row[1], 'rating': row[2]} for row in movies]
 
 
 def add_movie(title, year, rating):
@@ -35,19 +53,30 @@ def add_movie(title, year, rating):
             connection.execute(text("INSERT INTO movies (title, year, rating) VALUES (:title, :year, :rating)"),
                                {"title": title, "year": year, "rating": rating})
             connection.commit()
-            print(f"Movie '{title}' added successfully.")
         except Exception as e:
             print(f"Error: {e}")
 
 
 def delete_movie(title):
     """Delete a movie from the database."""
-    pass
+    with engine.connect() as connection:
+        try:
+            connection.execute(text("DELETE FROM movies WHERE title = :title"),
+                               {"title": title})
+            connection.commit()
+        except Exception as e:
+            print(f"Error: {e}")
 
 
 def update_movie(title, rating):
     """Update a movie's rating in the database."""
-    pass
+    with engine.connect() as connection:
+        try:
+            connection.execute(text("UPDATE movies SET rating =  :rating WHERE title = :title"),
+                               {"rating": rating, "title": title})
+            connection.commit()
+        except Exception as e:
+            print(f"Error: {e}")
 
 
 # Movie 'Inception' added successfully.
@@ -57,10 +86,6 @@ def update_movie(title, rating):
 # Movie 'Inception' deleted successfully.
 # []
 def run_test():
-    """ Tests the storage functions """
-    from movie_storage_sql import add_movie, list_movies, delete_movie, \
-        update_movie
-
     # Test adding a movie
     add_movie("Inception", 2010, 8.8)
 
@@ -75,3 +100,11 @@ def run_test():
     # Test deleting a movie
     delete_movie("Inception")
     print(list_movies())  # Should be empty if it was the only movie
+
+
+def main():
+    run_test()
+
+
+if __name__ == "__main__":
+    main()
