@@ -8,6 +8,7 @@ import Levenshtein # for Fuzzy Matching
 from movie_storage import movie_storage_json
 from movie_storage import movie_storage_sql
 from api import omdb_api
+import website
 
 EXPORT_DIR = 'data/exports/'
 
@@ -108,7 +109,7 @@ def add_movie():
     if movie_storage_sql.movie_exists(movie_name):
         cprint(f"Movie '{movie_name}' already exists!", "red")
     else:
-        movie = omdb_api.get_movie(movie_name)
+        movie = omdb_api.fetch_movie(movie_name)
         title = movie['Title']
         year = movie.get('Year')
         rating = movie.get('imdbRating')
@@ -251,6 +252,12 @@ def rating_histogram():
     cprint(f"Histogram successfully saved in {filename}", "green")
 
 
+def generate_website():
+    """ exports movie database to a local website """
+    website.export_movies_to_html()
+    print("Website was generated successfully.")
+
+
 def show_menu_and_run_choice():
     """
     this function prints the menu on the screen,
@@ -269,6 +276,7 @@ def show_menu_and_run_choice():
         7: ('Search movie', search_movie),
         8: ('Movies sorted by rating', show_movies_by_rating),
         9: ('Rating-Histogram', rating_histogram),
+        10: ('Generate Website', generate_website),
     }
 
     # print the menu...
@@ -277,7 +285,7 @@ def show_menu_and_run_choice():
         print(f"{num}. {menu_item[0]}")
 
     # ... and call the function according to the user's choice
-    cprint("\nYour choice (0-9): ", "blue", end="")
+    cprint("\nYour choice (0-10): ", "blue", end="")
     try:
         choice = int(input())
         if choice in menu_dispatcher:
