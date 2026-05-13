@@ -1,0 +1,6 @@
+statistics
+matplotlib
+Levenshtein
+python-dotenv
+requests
+sqlalchemy
