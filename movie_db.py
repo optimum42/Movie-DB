@@ -7,6 +7,7 @@ import matplotlib.pyplot # for histogram
 import Levenshtein # for Fuzzy Matching
 from movie_storage import movie_storage_json
 from movie_storage import movie_storage_sql
+from api import omdb_api
 
 EXPORT_DIR = 'data/exports/'
 
@@ -83,7 +84,8 @@ def show_movies(movies):
         print(f"{movie['title']}", end="")
         cprint(f" ({movie['year']})", "blue", end="")
         print(": ", end="")
-        cprint(f"{round(movie['rating'], 1)}", "cyan")
+        cprint(f"{round(movie['rating'], 1)}", "cyan", end="")
+        cprint(f"  Poster: {movie['poster']}", "blue")
 
 
 def show_all_movies():
@@ -106,10 +108,14 @@ def add_movie():
     if movie_storage_sql.movie_exists(movie_name):
         cprint(f"Movie '{movie_name}' already exists!", "red")
     else:
-        year = get_movie_year()
-        rating = get_movie_rating()
-        movie_storage_sql.add_movie(movie_name, year, rating)
-        cprint(f"Movie '{movie_name}' added successfully.", "green")
+        movie = omdb_api.get_movie(movie_name)
+        title = movie['Title']
+        year = movie.get('Year')
+        rating = movie.get('imdbRating')
+        poster = movie.get('Poster')
+
+        movie_storage_sql.add_movie(title, year, rating, poster)
+        cprint(f"Movie '{title}' added successfully.", "green")
 
 
 def delete_movie():
