@@ -27,9 +27,9 @@ def serialize_movie(movie):
     ret = ""
     ret += "<li>\n"
     ret += ("<div class='movie'>\n")
-    ret += "<img class='movie-poster'\n"
+    ret += f"<a target='_blank' href='{movie.get('imdb_url')}'><img class='movie-poster'\n"
     ret += f" src='{movie.get('poster')}'\n"
-    ret += f" title=''/>\n"
+    ret += f" title=''/></a>\n"
     ret += f"<div class='movie-title'>{movie.get('title')}</div>\n"
     ret += f"<div class='movie-year'>{movie.get('year')}</div>\n"
     ret += f"</div>\n"
