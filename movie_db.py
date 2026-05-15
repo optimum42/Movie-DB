@@ -7,6 +7,8 @@ from movie_storage import movie_storage_sql
 from api import omdb_api
 from helpers import display_formats
 import website
+from movie_storage.movie_storage_sql import add_user
+from data import blockbusters
 
 EXPORT_DIR = 'data/exports/'
 
@@ -24,21 +26,6 @@ def get_movie_name():
             display_formats.cprint(f"Please enter at least {min_chars} characters", "red")
         else:
             return movie_name
-
-
-def get_movie_rating():
-    """
-    this function prompts the user to enter a movie rating
-    :return movie rating as float
-    """
-    try:
-        rating = float(input('Enter new movie rating (0-10): '))
-        if rating < 0 or rating > 10:
-            raise ValueError
-        return rating
-    except ValueError:
-        display_formats.cprint("Invalid input!", "red")
-        return get_movie_rating()
 
 
 def get_movie_year():
@@ -69,6 +56,9 @@ def show_movies(movies):
         display_formats.cprint(f"{round(movie['rating'], 1)}", "cyan")
         display_formats.cprint(f"  Poster: {movie['poster']}", "blue")
         display_formats.cprint(f"  IMDb: {movie['imdb_url']}", "blue")
+        notes = movie['notes']
+        if notes is not None:
+            display_formats.cprint(f"  Notes: {notes}", "magenta")
         print()
 
 
@@ -90,10 +80,14 @@ def add_movie(user_name):
     adds the new movie to the database
     """
     movie_name = get_movie_name()
-    if movie_storage_sql.movie_exists(movie_name):
+    if movie_storage_sql.movie_exists(movie_name, user_name):
         display_formats.cprint(f"Movie '{movie_name}' already exists!", "red")
     else:
         movie = omdb_api.fetch_movie(movie_name)
+        if movie is None:
+            display_formats.cprint('No movie information found!', 'red')
+            return
+
         title = movie['Title']
         year = movie.get('Year')
         rating = movie.get('imdbRating')
@@ -109,8 +103,8 @@ def delete_movie(user_name):
     this function deletes a movie from the database
     """
     movie_name = get_movie_name()
-    if movie_storage_sql.movie_exists(user_name, movie_name):
-        movie_storage_sql.delete_movie(movie_name)
+    if movie_storage_sql.movie_exists(movie_name, user_name):
+        movie_storage_sql.delete_movie(user_name, movie_name)
         display_formats.cprint(f"Movie '{movie_name}' deleted successfully.", "green")
     else:
         display_formats.cprint(f"Movie '{movie_name}' doesn't exist!", "red")
@@ -121,9 +115,9 @@ def update_movie(user_name):
     this function updates a movie rating in the database
     """
     movie_name = get_movie_name()
-    if movie_storage_sql.movie_exists(movie_name):
-        rating = get_movie_rating()
-        movie_storage_sql.update_movie(movie_name, rating)
+    if movie_storage_sql.movie_exists(movie_name, user_name):
+        notes = input('Enter your notes: ')
+        movie_storage_sql.update_movie(movie_name, notes)
         display_formats.cprint(f"Movie '{movie_name}' updated successfully.", "green")
     else:
         display_formats.cprint(f"Movie '{movie_name}' doesn't exist!", "red")
@@ -239,7 +233,7 @@ def rating_histogram(user_name):
 
 def generate_website(user_name):
     """ exports movie database to a local website """
-    website.export_movies_to_html()
+    website.export_movies_to_html(user_name)
     print("Website was generated successfully.")
 
 
@@ -262,6 +256,8 @@ def show_menu_and_run_choice(user_name):
         8: ('Movies sorted by rating', show_movies_by_rating),
         9: ('Rating-Histogram', rating_histogram),
         10: ('Generate Website', generate_website),
+        11: ('Fill with 100 Blockbusters', init_movie_db),
+        12: ('Show movie details', movie_details),
     }
 
     while True:
@@ -290,21 +286,74 @@ def quit_program(user_name):
     quit()
 
 
+def add_user():
+    while True:
+        user_name = input("\nEnter new user: ")
+        if movie_storage_sql.add_user(user_name):
+            return user_name
+        display_formats.cprint('Invalid username', 'red')
+
+
 def select_user():
     """
     selects a user from the users table of the movie database
     """
-    users = movie_storage_sql.get_users()
+    users = list(movie_storage_sql.get_users().values())
     while True:
+        user_count = 1
+        display_formats.cprint('0: New user', 'magenta')
         for user in users:
-            print(f"{user}. {users[user]}")
+            print(f"{user_count}. {user}")
+            user_count += 1
         try:
-            user_id = int(input('\nSelect current user: '))
-            return users[user_id]
+            choice = int(input('\nSelect current user: '))
+            if 1 <= choice <= len(users):
+                return users[choice - 1]
+            elif choice == 0:
+                new_user = add_user()
+                return new_user
         except ValueError:
             pass
         display_formats.cprint('Invalid choice', 'red')
 
+
+def init_movie_db(user_name):
+    """ fills the movie database with Blockbusters """
+    for movie_name in blockbusters.TOP_MOVIES:
+        if movie_storage_sql.movie_exists(movie_name, user_name):
+            display_formats.cprint(f"Movie '{movie_name}' already exists!",
+                                   "red")
+        else:
+            movie = omdb_api.fetch_movie(movie_name)
+            if movie is None:
+                display_formats.cprint('No movie information found!', 'red')
+                return
+
+            title = movie['Title']
+            year = movie.get('Year')
+            rating = movie.get('imdbRating')
+            poster = movie.get('Poster')
+            imdb_url = omdb_api.get_imdb_url(title)
+            notes = movie.get('Awards')
+            movie_storage_sql.add_movie(user_name, title, year, rating, poster,imdb_url)
+            movie_storage_sql.update_movie(title, notes)
+            display_formats.cprint(f"Movie '{title}' added successfully.","green")
+
+
+def movie_details(user_name=None):
+    """
+    fetches movie details from the omdb api and displays it
+    """
+    title = get_movie_name()
+    res = omdb_api.fetch_movie(title)
+    for key, val in res.items():
+        if type(val) == list:
+            print(f"{key}:")
+            for item in val:
+                for k, v in item.items():
+                    print(f"  {k}: {v}")
+        else:
+            print(f"{key}: {val}")
 
 
 def main():
@@ -312,6 +361,9 @@ def main():
     the main function loops through the user's choice
     until the user enters '0' to quit the program
     """
+    welcome = "Welcome to your personal Movie Database"
+    stars = '*' * len(welcome)
+    display_formats.cprint(f"{stars}\n{welcome}\n{stars}", "cyan")
     user_name = select_user()
 
     stars = 10 * '*'

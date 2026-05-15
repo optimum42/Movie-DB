@@ -1,7 +1,7 @@
 from pathlib import Path
 from movie_storage import movie_storage_sql
 
-WEBSITE_TITLE = "Movie Heroes Database"
+WEBSITE_TITLE = "Movie Database of "
 HTML_TEMPLATE_FILE = "templates/index_template.html"
 HTML_OUTPUT_FILE = "data/exports/index.html"
 
@@ -30,8 +30,12 @@ def serialize_movie(movie):
     ret += f"<a target='_blank' href='{movie.get('imdb_url')}'><img class='movie-poster'\n"
     ret += f" src='{movie.get('poster')}'\n"
     ret += f" title=''/></a>\n"
+    ret += "<div class ='middle'>\n"
+    ret += f"<div class ='notes'>{movie.get('notes')}</div>\n"
+    ret += "</div>\n"
     ret += f"<div class='movie-title'>{movie.get('title')}</div>\n"
     ret += f"<div class='movie-year'>{movie.get('year')}</div>\n"
+    ret += f"<div class='movie-rating'>{movie.get('rating')}</div>\n"
     ret += f"</div>\n"
     ret += "</li>\n"
     return ret
@@ -40,22 +44,25 @@ def serialize_movie(movie):
 def movies_to_html(movies):
     """ writes all the movies to a string and returns it """
     output = ""
-    assert len(movies) > 0
-    for movie in movies:
-        output += serialize_movie(movie)
+    if len(movies) == 0:
+        output += "<h2><center>No movies found<center></h2>"
+    else:
+        for movie in movies:
+            output += serialize_movie(movie)
     return output
 
 
-def export_movies_to_html():
+def export_movies_to_html(user_name):
     """ exports all the movies to a local website using a template"""
     html_template = load_html(HTML_TEMPLATE_FILE)
+    website_title = WEBSITE_TITLE + user_name
     if html_template is not None:
-        html_output = html_template.replace("__TEMPLATE_TITLE__", WEBSITE_TITLE)
-        movies = movie_storage_sql.list_movies()
+        html_output = html_template.replace("__TEMPLATE_TITLE__", website_title)
+        movies = movie_storage_sql.list_movies(user_name)
         movies_html = movies_to_html(movies)
         html_output = html_output.replace("__TEMPLATE_MOVIE_GRID__", movies_html)
         write_html(html_output, HTML_OUTPUT_FILE)
 
 
 if __name__ == "__main__":
-    export_movies_to_html()
+    export_movies_to_html("Tine-Bine")

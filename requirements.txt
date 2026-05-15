@@ -1,6 +1,10 @@
 statistics
+datetime
+random
 matplotlib
 Levenshtein
-python-dotenv
-requests
+movie_storage
 sqlalchemy
+requests
+dotenv
+requests
