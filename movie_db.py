@@ -346,14 +346,17 @@ def movie_details(user_name=None):
     """
     title = get_movie_name()
     res = omdb_api.fetch_movie(title)
-    for key, val in res.items():
-        if type(val) == list:
-            print(f"{key}:")
-            for item in val:
-                for k, v in item.items():
-                    print(f"  {k}: {v}")
-        else:
-            print(f"{key}: {val}")
+    if res is not None:
+        for key, val in res.items():
+            if type(val) == list:
+                print(f"{key}:")
+                for item in val:
+                    for k, v in item.items():
+                        print(f"  {k}: {v}")
+            else:
+                print(f"{key}: {val}")
+    else:
+        display_formats.cprint("No movie details found!", "red")
 
 
 def main():
